@@ -1,0 +1,375 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>실시간 OX 퀴즈 - 학생 화면</title>
+
+  <style>
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      margin: 0;
+      font-family: Arial, "Pretendard", sans-serif;
+      background: #f4f7fb;
+      color: #222;
+      min-height: 100vh;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      padding: 24px;
+    }
+
+    .container {
+      width: 100%;
+      max-width: 720px;
+      background: white;
+      border-radius: 28px;
+      padding: 32px;
+      box-shadow: 0 12px 30px rgba(0, 0, 0, 0.12);
+      text-align: center;
+    }
+
+    h1 {
+      font-size: 36px;
+      margin-bottom: 12px;
+    }
+
+    .subtitle {
+      font-size: 18px;
+      color: #666;
+      margin-bottom: 28px;
+    }
+
+    .nickname-box {
+      display: flex;
+      gap: 12px;
+      margin-bottom: 28px;
+    }
+
+    input {
+      flex: 1;
+      padding: 16px;
+      font-size: 20px;
+      border-radius: 14px;
+      border: 2px solid #ddd;
+    }
+
+    button {
+      border: none;
+      border-radius: 16px;
+      cursor: pointer;
+      font-weight: bold;
+      transition: 0.2s;
+    }
+
+    button:hover {
+      transform: scale(1.03);
+    }
+
+    .join-btn {
+      padding: 16px 24px;
+      font-size: 20px;
+      background: #2563eb;
+      color: white;
+    }
+
+    .question-card {
+      background: #f8fafc;
+      border-radius: 24px;
+      padding: 32px;
+      margin-bottom: 28px;
+      border: 2px solid #e5e7eb;
+    }
+
+    .status {
+      font-size: 18px;
+      color: #555;
+      margin-bottom: 16px;
+    }
+
+    .question {
+      font-size: 32px;
+      font-weight: bold;
+      line-height: 1.4;
+      min-height: 120px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .answer-buttons {
+      display: flex;
+      gap: 20px;
+      justify-content: center;
+      margin-bottom: 24px;
+    }
+
+    .answer-btn {
+      width: 180px;
+      height: 140px;
+      font-size: 72px;
+      color: white;
+      border-radius: 32px;
+    }
+
+    .o-btn {
+      background: #2563eb;
+    }
+
+    .x-btn {
+      background: #ef4444;
+    }
+
+    .message {
+      font-size: 24px;
+      font-weight: bold;
+      min-height: 36px;
+    }
+
+    .correct {
+      color: #16a34a;
+    }
+
+    .wrong {
+      color: #dc2626;
+    }
+
+    .hidden {
+      display: none;
+    }
+
+    .small {
+      font-size: 16px;
+      color: #777;
+      margin-top: 20px;
+    }
+
+    @media (max-width: 600px) {
+      .nickname-box {
+        flex-direction: column;
+      }
+
+      .answer-buttons {
+        flex-direction: column;
+      }
+
+      .answer-btn {
+        width: 100%;
+      }
+
+      h1 {
+        font-size: 30px;
+      }
+
+      .question {
+        font-size: 26px;
+      }
+    }
+  </style>
+</head>
+
+<body>
+  <div class="container">
+    <h1>실시간 OX 퀴즈</h1>
+    <div class="subtitle">닉네임을 입력하고 O 또는 X를 선택하세요.</div>
+
+    <div id="joinArea" class="nickname-box">
+      <input id="nicknameInput" type="text" placeholder="닉네임 입력" />
+      <button class="join-btn" onclick="joinGame()">참여하기</button>
+    </div>
+
+    <div id="quizArea" class="hidden">
+      <div class="question-card">
+        <div id="statusText" class="status">대기 중입니다.</div>
+        <div id="questionText" class="question">문제를 기다리고 있어요.</div>
+      </div>
+
+      <div class="answer-buttons">
+        <button class="answer-btn o-btn" onclick="submitAnswer('O')">O</button>
+        <button class="answer-btn x-btn" onclick="submitAnswer('X')">X</button>
+      </div>
+
+      <div id="message" class="message"></div>
+      <div id="studentInfo" class="small"></div>
+    </div>
+  </div>
+
+  <script type="module">
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
+    import {
+      getDatabase,
+      ref,
+      onValue,
+      set,
+      update
+    } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-database.js";
+
+    // ==================================================
+    // 중요:
+    // 아래 firebaseConfig는 반드시 본인 Firebase 콘솔에서 복사한 값으로 바꿔야 합니다.
+    // Firebase 콘솔 → 프로젝트 개요 → 앱 설정 → SDK 설정 및 구성
+    // ==================================================
+const firebaseConfig = {
+  apiKey: "AIzaSyAqqQYRZGCLrL3ftdIToPrQ_7q2EwcmaaM",
+  authDomain: "ox-quiz-game-c8248.firebaseapp.com",
+  databaseURL: "https://ox-quiz-game-c8248-default-rtdb.asia-southeast1.firebasedatabase.app",
+  projectId: "ox-quiz-game-c8248",
+  storageBucket: "ox-quiz-game-c8248.firebasestorage.app",
+  messagingSenderId: "1054918706871",
+  appId: "1:1054918706871:web:83ef8514154c53e1436f32",
+  measurementId: "G-8CQCCCWCMM"
+};
+    const app = initializeApp(firebaseConfig);
+    const db = getDatabase(app);
+
+    let studentId = localStorage.getItem("studentId");
+    let studentName = localStorage.getItem("studentName");
+    let currentQuestionId = null;
+    let currentAnswer = null;
+    let gameStatus = "waiting";
+
+    const joinArea = document.getElementById("joinArea");
+    const quizArea = document.getElementById("quizArea");
+    const nicknameInput = document.getElementById("nicknameInput");
+    const statusText = document.getElementById("statusText");
+    const questionText = document.getElementById("questionText");
+    const message = document.getElementById("message");
+    const studentInfo = document.getElementById("studentInfo");
+
+    if (studentId && studentName) {
+      joinArea.classList.add("hidden");
+      quizArea.classList.remove("hidden");
+      studentInfo.textContent = `${studentName}님으로 참여 중`;
+      listenGame();
+    }
+
+    window.joinGame = function () {
+      const name = nicknameInput.value.trim();
+
+      if (!name) {
+        alert("닉네임을 입력하세요.");
+        return;
+      }
+
+      studentId = "student_" + Date.now();
+      studentName = name;
+
+      localStorage.setItem("studentId", studentId);
+      localStorage.setItem("studentName", studentName);
+
+      set(ref(db, "students/" + studentId), {
+        name: studentName,
+        score: 0,
+        answer: "",
+        isCorrect: false
+      });
+
+      joinArea.classList.add("hidden");
+      quizArea.classList.remove("hidden");
+      studentInfo.textContent = `${studentName}님으로 참여 중`;
+
+      listenGame();
+    };
+
+    function listenGame() {
+      const gameRef = ref(db, "game");
+
+      onValue(gameRef, (snapshot) => {
+        const game = snapshot.val();
+
+        if (!game) {
+          statusText.textContent = "게임 정보를 불러올 수 없습니다.";
+          return;
+        }
+
+        currentQuestionId = game.currentQuestionId;
+        gameStatus = game.status;
+
+        loadQuestion(currentQuestionId);
+
+        if (gameStatus === "waiting") {
+          statusText.textContent = "대기 중입니다.";
+          message.textContent = "";
+          message.className = "message";
+        }
+
+        if (gameStatus === "playing") {
+          statusText.textContent = "문제가 진행 중입니다.";
+          message.textContent = "O 또는 X를 선택하세요.";
+          message.className = "message";
+        }
+
+        if (gameStatus === "revealed") {
+          statusText.textContent = "정답이 공개되었습니다.";
+          checkResult();
+        }
+      });
+    }
+
+    function loadQuestion(questionId) {
+      if (!questionId) return;
+
+      const questionRef = ref(db, "questions/" + questionId);
+
+      onValue(questionRef, (snapshot) => {
+        const question = snapshot.val();
+
+        if (!question) {
+          questionText.textContent = "문제가 없습니다.";
+          return;
+        }
+
+        questionText.textContent = question.text;
+        currentAnswer = question.answer;
+      });
+    }
+
+    window.submitAnswer = function (answer) {
+      if (!studentId) {
+        alert("먼저 닉네임을 입력하세요.");
+        return;
+      }
+
+      if (gameStatus !== "playing") {
+        alert("아직 문제 진행 중이 아닙니다.");
+        return;
+      }
+
+      update(ref(db, "students/" + studentId), {
+        answer: answer,
+        isCorrect: answer === currentAnswer
+      });
+
+      message.textContent = `${answer}를 선택했습니다.`;
+      message.className = "message";
+    };
+
+    function checkResult() {
+      if (!studentId) return;
+
+      const studentRef = ref(db, "students/" + studentId);
+
+      onValue(studentRef, (snapshot) => {
+        const student = snapshot.val();
+
+        if (!student || !student.answer) {
+          message.textContent = "답을 제출하지 않았습니다.";
+          message.className = "message wrong";
+          return;
+        }
+
+        if (student.answer === currentAnswer) {
+          message.textContent = `정답입니다! 정답은 ${currentAnswer}`;
+          message.className = "message correct";
+        } else {
+          message.textContent = `아쉬워요. 정답은 ${currentAnswer}`;
+          message.className = "message wrong";
+        }
+      });
+    }
+  </script>
+</body>
+</html>
